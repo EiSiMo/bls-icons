@@ -1,7 +1,9 @@
 """Modal-based background removal for BLS icons.
 
-Runs BiRefNet-massive on a Modal T4 GPU (Turing, sm_75 — full cuDNN-Frontend
-support, no Pascal issues). For ~5000 icons: ~$0.70 total, ~30 min wall time.
+Runs BiRefNet-massive on a Modal A10G GPU (Ampere, sm_86 — full cuDNN-Frontend
+support, ~3× faster than T4 for BiRefNet inference). For ~5000 icons:
+~$0.25 total, ~10–12 min wall time. T4 also works (cheaper hourly but
+slower overall). A100-40GB gives another ~2× speedup if you want to splurge.
 
 One-time setup:
     pip install modal
@@ -45,11 +47,11 @@ image = (
         "numpy",
         "onnxruntime-gpu",
     )
-    .run_function(_preload_model, gpu="T4")
+    .run_function(_preload_model, gpu="A10G")
 )
 
 
-@app.cls(image=image, gpu="T4", scaledown_window=120, timeout=900)
+@app.cls(image=image, gpu="A10G", scaledown_window=120, timeout=900)
 class BgRemover:
     @modal.enter()
     def load(self):
