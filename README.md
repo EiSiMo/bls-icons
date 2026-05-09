@@ -20,6 +20,18 @@ icon_path = f"icons_raw/{aliases[bls_code]}.png"
 
 Without `git lfs pull` you only get the metadata (~23 MB, clones in seconds).
 
+## Known limitations
+
+A small fraction of the icons contain hallucinations — e.g. a sausage that the
+model rendered as two pieces, a "canned" product without the can shown,
+double-stacked items, or anatomically odd cuts of meat. The image model is
+non-deterministic and occasionally ignores parts of its prompt.
+
+I'm working through the dataset by hand to spot these and regenerate them with
+sharper prompts. If you find one that's clearly wrong, open an issue (see
+[CONTRIBUTING.md](CONTRIBUTING.md)) with the icon code and I'll add it to the
+queue. Already fixed: `Y945032` (Rostbratwurst mit Senf).
+
 ## Regenerate or extend
 
 ```bash
