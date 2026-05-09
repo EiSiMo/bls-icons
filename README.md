@@ -46,6 +46,24 @@ resume, full logging to `pipeline.log`, and synchronous regeneration for items
 that hit OpenAI's image moderation (raw animal products occasionally trigger
 false-positive `safety_violations=[sexual]`).
 
+## Repo layout
+
+```
+.
+├── items.csv               4987 canonical icons (code, name_de, name_en)
+├── aliases.csv             7140 BLS-code → icon-code mapping
+├── run_pipeline.py         end-to-end orchestrator (entry point)
+├── modal_postprocess.py    Modal entry point for background removal
+├── grid.png                README preview (regenerable via tools/make_grid.py)
+├── icons_raw/              white-bg PNGs (LFS)
+├── icons/                  transparent PNGs after bg removal (LFS)
+└── tools/
+    ├── sync_icons.py       copies act-img-gen output → icons_raw/
+    ├── build_viewer.py     builds index.html (gitignored, run locally)
+    ├── make_grid.py        regenerates grid.png
+    └── fix_missing.py      sync regen for items missing from icons_raw/
+```
+
 ## Models
 
 | Step | Model | Mode | Cost (full run) |

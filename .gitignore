@@ -1,4 +1,5 @@
 pipeline.log
+index.html
 __pycache__/
 *.pyc
 .DS_Store

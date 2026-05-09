@@ -9,7 +9,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]  # repo root
 SRC_ROOT = ROOT.parent / "act-img-gen" / "output" / "comic_v4"
 DST = ROOT / "icons"           # transparent (production)
 DST_RAW = ROOT / "icons_raw"   # white-background original

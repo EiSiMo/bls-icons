@@ -287,7 +287,7 @@ def _regen_one(sbls: str, name_de: str, name_en: str, item_dir: Path,
 
 
 def step_sync_raw() -> int:
-    return run_cmd([sys.executable, "-X", "utf8", str(ROOT / "sync_icons.py")],
+    return run_cmd([sys.executable, "-X", "utf8", str(ROOT / "tools" / "sync_icons.py")],
                    tag="sync")
 
 
@@ -302,7 +302,7 @@ def step_modal() -> int:
 
 
 def step_viewer() -> int:
-    return run_cmd([sys.executable, "-X", "utf8", str(ROOT / "build_viewer.py")],
+    return run_cmd([sys.executable, "-X", "utf8", str(ROOT / "tools" / "build_viewer.py")],
                    tag="viewer")
 
 

@@ -20,7 +20,7 @@ import sys
 import time
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]  # repo root
 ACT = ROOT.parent / "act-img-gen"
 OUTPUT = ACT / "output" / "comic_v4"
 ICONS_RAW = ROOT / "icons_raw"

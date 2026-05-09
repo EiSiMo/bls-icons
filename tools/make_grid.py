@@ -9,7 +9,7 @@ import random
 from pathlib import Path
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]  # repo root
 SRC = ROOT / "icons_raw"
 OUT = ROOT / "grid.png"
 

@@ -10,7 +10,7 @@ import csv
 import json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]  # repo root
 ICONS = ROOT / "icons"
 ITEMS_CSV = ROOT / "items.csv"
 OUT = ROOT / "index.html"
