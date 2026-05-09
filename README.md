@@ -55,12 +55,6 @@ icon_path = f"icons/{aliases[bls_code]}.png"
 
 ## How it was made
 
-The dataset was built in two phases: a one-shot generation pass for the
-initial 4987 icons, then a manual review loop that refined ~22 % of them
-based on per-item visual feedback.
-
-### Phase 1: initial generation
-
 1. **Source.** BLS 4.0 Excel parsed via `openpyxl`, 7140 items.
 2. **Deduplication.** Regex-strip preparation suffixes from item names →
    4987 canonical icons. `aliases.csv` keeps the full mapping so any BLS
@@ -82,51 +76,16 @@ idempotent resume, full logging to `pipeline.log`, and synchronous
 regeneration for items that hit OpenAI's image moderation (raw animal
 products occasionally trigger false-positive `safety_violations=[sexual]`).
 
-### Phase 2: manual review + iterative regeneration
+After the initial generation, every icon was hand-reviewed and ~22 % were
+refined: 489 alpha-mask swaps where naïve PIL flood-fill beat BiRefNet,
+612 prompt rewrites + image regens informed by per-item reviewer feedback
+(across two rounds), 16 white-powder items (flour, starch, milk powder)
+collapsed onto a single canonical image to avoid the BiRefNet-on-white
+mask issue, plus a handful of hand-picked swaps and reverts. Total
+refinement cost: ~$2.66. The pre-refinement v1 dataset is preserved at
+tag `v1.0`.
 
-Every icon was hand-reviewed using `tools/review.py`, a Tkinter app that
-shows three side-by-side panels per item — PIL flood-fill alpha, BiRefNet
-alpha, and the raw white-bg image — plus the prompt that produced them.
-For each item the reviewer chose which alpha-removal method came out
-better, optionally flagged image hallucinations with a one-line note
-("Buttermilch ist eingebacken, nicht zu sehen"), or marked the item as
-"both bad" for full regen.
-
-The flagged items then went through a small pipeline:
-
-1. **`tools/swap_pil_alphas.py`** — for items where the reviewer picked
-   "PIL flood-fill better", swap `icons/<code>.png` to a fresh
-   full-resolution flood-fill mask. Cheap; no image regen needed.
-2. **`tools/prepare_round2.py`** — for items with specific feedback, ask
-   `gpt-5-mini` to rewrite the original prompt incorporating the German
-   reviewer note. The trailing style block stays verbatim.
-3. **`tools/run_round2_batch.py`** — submit a fresh OpenAI image batch
-   for all flagged items, snapshotting the prior images first so the
-   review tool can show "before" thumbnails next round.
-4. **`tools/run_round2_finalize.py`** — sync the new images back into
-   `icons_raw/`, delete the stale alphas, re-run Modal bg-removal.
-5. **`tools/migrate_review_for_round2.py`** — move the resolved review
-   entries into `review_history` and reset the navigation set so the
-   reviewer only sees newly-regenerated items in the next pass.
-
-After two iteration rounds plus a small batch of manual swaps and
-canonical-image dedups, the dataset stabilised. Final tally of
-post-generation refinements:
-
-| Action | Items | Note |
-|---|---|---|
-| PIL-flood-fill alpha swap | 489 | BiRefNet's mask was worse than naïve flood-fill |
-| Prompt rewrite + image regen (round 2) | 574 | gpt-5-mini rewrote prompt from reviewer feedback |
-| Prompt rewrite + image regen (round 3) | 38 | further iteration on still-wrong items |
-| Dedup to canonical image | 16 | white-powder items (flour, starch, milk powder) → `C213200` |
-| Revert to round-1 image | 5 | regen came out worse than the original |
-| Manual image swap | 6 | toast variants, milk containers, grape juice |
-| **Total refined** | **1128** | ~22 % of the 4987 icons |
-
-Total post-generation cost: ~$2.66 (OpenAI prompter $0.18, image batch
-$2.40, Modal A10G $0.08).
-
-## Regenerate or extend
+## Regenerate
 
 ```bash
 # companion repo: prompter + image-gen + style spec
@@ -143,12 +102,6 @@ echo "OPENAI_API_KEY=sk-..." > ../act-img-gen/.env
 python run_pipeline.py
 ```
 
-To run the review loop on your own copy, install `Pillow`, then:
-
-```bash
-python tools/review.py     # Tkinter window; state persists in review.json
-```
-
 ## Models
 
 | Step | Model | Mode | Approx. cost (full 4987-item run) |
@@ -156,7 +109,6 @@ python tools/review.py     # Tkinter window; state persists in review.json
 | Prompter | `gpt-5-mini` (`reasoning_effort=minimal`) | sync | ~$1 |
 | Image gen | `gpt-image-2` quality `low` | OpenAI Batch | ~$22 |
 | Background removal | `BiRefNet-massive` (rembg) | Modal A10G GPU | ~$0.25 |
-| Feedback-driven prompt rewrite | `gpt-5-mini` | sync | ~$0.0004 / item |
 
 ## Repo layout
 
@@ -171,22 +123,10 @@ python tools/review.py     # Tkinter window; state persists in review.json
 ├── icons_raw/              white-bg PNGs (LFS)
 ├── icons/                  transparent PNGs after bg removal (LFS)
 └── tools/
-    ├── sync_icons.py                    copies act-img-gen output → icons_raw/
-    ├── build_viewer.py                  builds index.html (gitignored, run locally)
-    ├── make_grid.py                     regenerates grid.png / grid_alpha.png
-    ├── fix_missing.py                   sync regen for items missing from icons_raw/
-    ├── review.py                        interactive review GUI (Tkinter)
-    ├── swap_pil_alphas.py               recompute PIL-flood-fill alphas at full res
-    ├── prepare_round2.py                feedback-aware prompt rewriter
-    ├── run_round2_batch.py              submit OpenAI image batch for flagged items
-    ├── run_round2_finalize.py           sync + drop stale alphas + Modal bg-removal
-    ├── migrate_review_for_round2.py     prepare review.json for the next round
-    └── stash_round1.py                  extract prior-round images from git LFS
+    ├── sync_icons.py       copies act-img-gen output → icons_raw/
+    ├── fix_missing.py      sync regen for items missing from icons_raw/
+    └── make_grid.py        regenerates grid.png / grid_alpha.png
 ```
-
-The `round2` in the script names is a historical artefact — the same
-scripts handle round 3, round 4, …; each invocation just operates on
-whatever's currently flagged in `review.json`.
 
 ## Storage
 

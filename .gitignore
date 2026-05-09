@@ -1,10 +1,7 @@
 pipeline.log
 pipeline_round2.log
-index.html
 review.json
-review.json.tmp
-icons_round1_raw/
-icons_round1_alpha/
+index.html
 __pycache__/
 *.pyc
 .DS_Store
