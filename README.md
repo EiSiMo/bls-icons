@@ -4,6 +4,43 @@ In my project [ACP](https://git.moritz.run/moritz/act) (Adaptive Calorie Tracker
 
 ![100 random samples from the dataset](grid.png)
 
+## Use it in your app
+
+```bash
+git clone ssh://git@git.moritz.run:2222/moritz/bls-icons.git
+cd bls-icons
+git lfs pull        # download all 4987 PNGs (~4.5 GB)
+```
+
+```python
+import csv
+aliases = dict(row.values() for row in csv.DictReader(open("aliases.csv")))
+icon_path = f"icons_raw/{aliases[bls_code]}.png"
+```
+
+Without `git lfs pull` you only get the metadata (~23 MB, clones in seconds).
+
+## Regenerate or extend
+
+```bash
+# companion repo: prompter + image-gen + style spec
+git clone ssh://git@git.moritz.run:2222/moritz/act-img-gen.git ../act-img-gen
+
+# local deps
+pip install -r requirements.txt
+pip install -r ../act-img-gen/requirements.txt
+
+# OpenAI key for prompter + image gen
+echo "OPENAI_API_KEY=sk-..." > ../act-img-gen/.env
+
+# end-to-end run (~$22, batch completes in <24 h)
+python run_pipeline.py --skip-modal
+
+# optional second stage: transparent backgrounds via Modal T4 GPUs (~$0.70)
+modal token new
+python -m modal run modal_postprocess.py
+```
+
 ## Dataset
 
 | | |
@@ -78,3 +115,8 @@ Icons are stored via **Git LFS** (`*.png` in `icons/` and `icons_raw/`). A plain
 `git clone` only fetches the small text/CSV files; binaries arrive on first
 checkout (or `git lfs pull`). The repo itself stays small enough to clone in
 seconds.
+
+## License
+
+Released into the public domain under [CC0 1.0](LICENSE). Use, modify, and
+redistribute the icons, code, and metadata for any purpose without attribution.

@@ -1,0 +1,8 @@
+# Local dependencies for the bls-icons pipeline.
+# The companion repo `act-img-gen` has its own requirements.txt for the
+# generation step (OpenAI client, openpyxl, ...). Install both to reproduce
+# the dataset end-to-end.
+
+Pillow>=10.0      # tools/make_grid.py
+requests>=2.31    # run_pipeline.py (sync regen) and tools/fix_missing.py
+modal>=0.60       # modal_postprocess.py (background removal on T4 GPUs)
