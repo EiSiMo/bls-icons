@@ -2,12 +2,14 @@
 
 In my project [ACP](https://git.moritz.run/moritz/act) (Adaptive Calorie Tracker) I am using the BLS Dataset for the nutritional information of generic German products. Unfortunatley I was missing clean, same-styled Icons for each of the 7140 individual entries. Thats why I used AI to genrate my own. If you need something like this too: here you go.
 
-![100 random samples from the dataset](grid.png)
+10 random samples per BLS Hauptgruppe, one row per category:
 
-Same 100 items with backgrounds removed (checkered grid is just to show the
-alpha — the actual files are transparent):
+![Sample grid, 10 items per BLS Hauptgruppe](grid.png)
 
-![100 random samples, transparent variant](grid_alpha.png)
+Same items with backgrounds removed (the checker is just to show the alpha
+— the actual files are transparent):
+
+![Sample grid, transparent variant](grid_alpha.png)
 
 > **Mirror notice.** This repo lives canonically at
 > [git.moritz.run/moritz/bls-icons](https://git.moritz.run/moritz/bls-icons)
