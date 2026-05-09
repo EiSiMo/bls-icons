@@ -4,6 +4,11 @@ In my project [ACP](https://git.moritz.run/moritz/act) (Adaptive Calorie Tracker
 
 ![100 random samples from the dataset](grid.png)
 
+Same 100 items with backgrounds removed (checkered grid is just to show the
+alpha — the actual files are transparent):
+
+![100 random samples, transparent variant](grid_alpha.png)
+
 > **Mirror notice.** This repo lives canonically at
 > [git.moritz.run/moritz/bls-icons](https://git.moritz.run/moritz/bls-icons)
 > with all icons stored via Git LFS. The
