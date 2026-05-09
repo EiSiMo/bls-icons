@@ -4,6 +4,13 @@ In my project [ACP](https://git.moritz.run/moritz/act) (Adaptive Calorie Tracker
 
 ![100 random samples from the dataset](grid.png)
 
+> **Mirror notice.** This repo lives canonically at
+> [git.moritz.run/moritz/bls-icons](https://git.moritz.run/moritz/bls-icons)
+> with all icons stored via Git LFS. The
+> [GitHub mirror](https://github.com/EiSiMo/bls-icons) carries the code and
+> metadata only — clone from the canonical source if you want the binary
+> images.
+
 ## Use it in your app
 
 ```bash
