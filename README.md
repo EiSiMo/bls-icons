@@ -32,39 +32,6 @@ icon_path = f"icons_raw/{aliases[bls_code]}.png"
 
 Without `git lfs pull` you only get the metadata (~23 MB, clones in seconds).
 
-## Known limitations
-
-A small fraction of the icons contain hallucinations — e.g. a sausage that the
-model rendered as two pieces, a "canned" product without the can shown,
-double-stacked items, or anatomically odd cuts of meat. The image model is
-non-deterministic and occasionally ignores parts of its prompt.
-
-I'm working through the dataset by hand to spot these and regenerate them with
-sharper prompts. If you find one that's clearly wrong, open an issue (see
-[CONTRIBUTING.md](CONTRIBUTING.md)) with the icon code and I'll add it to the
-queue. Already fixed: `Y945032` (Rostbratwurst mit Senf).
-
-## Regenerate or extend
-
-```bash
-# companion repo: prompter + image-gen + style spec
-git clone ssh://git@git.moritz.run:2222/moritz/act-img-gen.git ../act-img-gen
-
-# local deps
-pip install -r requirements.txt
-pip install -r ../act-img-gen/requirements.txt
-
-# OpenAI key for prompter + image gen
-echo "OPENAI_API_KEY=sk-..." > ../act-img-gen/.env
-
-# end-to-end run (~$22, batch completes in <24 h)
-python run_pipeline.py --skip-modal
-
-# optional second stage: transparent backgrounds via Modal T4 GPUs (~$0.70)
-modal token new
-python -m modal run modal_postprocess.py
-```
-
 ## Dataset
 
 | | |
@@ -84,28 +51,110 @@ method (raw, cooked, fried, ...) onto a shared icon. Lookup at app runtime:
 icon_path = f"icons/{aliases[bls_code]}.png"
 ```
 
-## Workflow
+## How it was made
+
+The dataset was built in two phases: a one-shot generation pass for the
+initial 4987 icons, then a manual review loop that refined ~22 % of them
+based on per-item visual feedback.
+
+### Phase 1: initial generation
 
 1. **Source.** BLS 4.0 Excel parsed via `openpyxl`, 7140 items.
-2. **Deduplication.** Regex-strip preparation suffixes from item names → 4987
-   canonical icons. `aliases.csv` keeps the full mapping so any BLS code can
-   resolve to its icon.
-3. **Prompt generation.** Per item, `gpt-5-mini` reads the German + English name
-   and the style spec (`comic_v4.md` in [act-img-gen](https://git.moritz.run/moritz/act-img-gen))
-   and returns an image prompt. Sync API call, ~3 cents per 100 items.
-4. **Image generation.** `gpt-image-2` at quality `low`, 1024×1024, via the
-   OpenAI Batch API (50% discount, async with 24h window). Output is a PNG with
-   white background. ~$22 for the full 4987-item run.
-5. **Background removal (optional).** `BiRefNet-massive` via the `rembg` library,
-   run on Modal serverless **T4 GPUs**. ~$0.70 and ~30 min wall time for 4987
-   icons. Local Pascal-class GPUs (e.g. GTX 1080) hit cuDNN-frontend issues, hence
-   the Modal route.
+2. **Deduplication.** Regex-strip preparation suffixes from item names →
+   4987 canonical icons. `aliases.csv` keeps the full mapping so any BLS
+   code can resolve to its icon.
+3. **Prompt generation.** Per item, `gpt-5-mini` reads the German + English
+   name and the style spec (`comic_v4.md` in
+   [act-img-gen](https://git.moritz.run/moritz/act-img-gen)) and returns
+   an image prompt. Sync API call, ~3 cents per 100 items.
+4. **Image generation.** `gpt-image-2` at quality `low`, 1024×1024, via
+   the OpenAI Batch API (50 % discount, async with 24 h window). Output
+   is a PNG with white background. ~$22 for the full 4987-item run.
+5. **Background removal.** `BiRefNet-massive` via the `rembg` library,
+   run on Modal serverless A10G GPUs. ~$0.25 and ~10–12 min wall time
+   for 4987 icons.
 6. **Output.** White-bg PNGs in `icons_raw/`, transparent PNGs in `icons/`.
 
-The orchestrator `run_pipeline.py` chains all steps with retries, idempotent
-resume, full logging to `pipeline.log`, and synchronous regeneration for items
-that hit OpenAI's image moderation (raw animal products occasionally trigger
-false-positive `safety_violations=[sexual]`).
+The orchestrator `run_pipeline.py` chains all steps with retries,
+idempotent resume, full logging to `pipeline.log`, and synchronous
+regeneration for items that hit OpenAI's image moderation (raw animal
+products occasionally trigger false-positive `safety_violations=[sexual]`).
+
+### Phase 2: manual review + iterative regeneration
+
+Every icon was hand-reviewed using `tools/review.py`, a Tkinter app that
+shows three side-by-side panels per item — PIL flood-fill alpha, BiRefNet
+alpha, and the raw white-bg image — plus the prompt that produced them.
+For each item the reviewer chose which alpha-removal method came out
+better, optionally flagged image hallucinations with a one-line note
+("Buttermilch ist eingebacken, nicht zu sehen"), or marked the item as
+"both bad" for full regen.
+
+The flagged items then went through a small pipeline:
+
+1. **`tools/swap_pil_alphas.py`** — for items where the reviewer picked
+   "PIL flood-fill better", swap `icons/<code>.png` to a fresh
+   full-resolution flood-fill mask. Cheap; no image regen needed.
+2. **`tools/prepare_round2.py`** — for items with specific feedback, ask
+   `gpt-5-mini` to rewrite the original prompt incorporating the German
+   reviewer note. The trailing style block stays verbatim.
+3. **`tools/run_round2_batch.py`** — submit a fresh OpenAI image batch
+   for all flagged items, snapshotting the prior images first so the
+   review tool can show "before" thumbnails next round.
+4. **`tools/run_round2_finalize.py`** — sync the new images back into
+   `icons_raw/`, delete the stale alphas, re-run Modal bg-removal.
+5. **`tools/migrate_review_for_round2.py`** — move the resolved review
+   entries into `review_history` and reset the navigation set so the
+   reviewer only sees newly-regenerated items in the next pass.
+
+After two iteration rounds plus a small batch of manual swaps and
+canonical-image dedups, the dataset stabilised. Final tally of
+post-generation refinements:
+
+| Action | Items | Note |
+|---|---|---|
+| PIL-flood-fill alpha swap | 489 | BiRefNet's mask was worse than naïve flood-fill |
+| Prompt rewrite + image regen (round 2) | 574 | gpt-5-mini rewrote prompt from reviewer feedback |
+| Prompt rewrite + image regen (round 3) | 38 | further iteration on still-wrong items |
+| Dedup to canonical image | 16 | white-powder items (flour, starch, milk powder) → `C213200` |
+| Revert to round-1 image | 5 | regen came out worse than the original |
+| Manual image swap | 6 | toast variants, milk containers, grape juice |
+| **Total refined** | **1128** | ~22 % of the 4987 icons |
+
+Total post-generation cost: ~$2.66 (OpenAI prompter $0.18, image batch
+$2.40, Modal A10G $0.08).
+
+## Regenerate or extend
+
+```bash
+# companion repo: prompter + image-gen + style spec
+git clone ssh://git@git.moritz.run:2222/moritz/act-img-gen.git ../act-img-gen
+
+# local deps
+pip install -r requirements.txt
+pip install -r ../act-img-gen/requirements.txt
+
+# OpenAI key for prompter + image gen
+echo "OPENAI_API_KEY=sk-..." > ../act-img-gen/.env
+
+# end-to-end run (~$22 + ~$0.25 Modal, completes in <24 h)
+python run_pipeline.py
+```
+
+To run the review loop on your own copy, install `Pillow`, then:
+
+```bash
+python tools/review.py     # Tkinter window; state persists in review.json
+```
+
+## Models
+
+| Step | Model | Mode | Approx. cost (full 4987-item run) |
+|---|---|---|---|
+| Prompter | `gpt-5-mini` (`reasoning_effort=minimal`) | sync | ~$1 |
+| Image gen | `gpt-image-2` quality `low` | OpenAI Batch | ~$22 |
+| Background removal | `BiRefNet-massive` (rembg) | Modal A10G GPU | ~$0.25 |
+| Feedback-driven prompt rewrite | `gpt-5-mini` | sync | ~$0.0004 / item |
 
 ## Repo layout
 
@@ -116,29 +165,39 @@ false-positive `safety_violations=[sexual]`).
 ├── run_pipeline.py         end-to-end orchestrator (entry point)
 ├── modal_postprocess.py    Modal entry point for background removal
 ├── grid.png                README preview (regenerable via tools/make_grid.py)
+├── grid_alpha.png          transparent variant of the same grid
 ├── icons_raw/              white-bg PNGs (LFS)
 ├── icons/                  transparent PNGs after bg removal (LFS)
 └── tools/
-    ├── sync_icons.py       copies act-img-gen output → icons_raw/
-    ├── build_viewer.py     builds index.html (gitignored, run locally)
-    ├── make_grid.py        regenerates grid.png
-    └── fix_missing.py      sync regen for items missing from icons_raw/
+    ├── sync_icons.py                    copies act-img-gen output → icons_raw/
+    ├── build_viewer.py                  builds index.html (gitignored, run locally)
+    ├── make_grid.py                     regenerates grid.png / grid_alpha.png
+    ├── fix_missing.py                   sync regen for items missing from icons_raw/
+    ├── review.py                        interactive review GUI (Tkinter)
+    ├── swap_pil_alphas.py               recompute PIL-flood-fill alphas at full res
+    ├── prepare_round2.py                feedback-aware prompt rewriter
+    ├── run_round2_batch.py              submit OpenAI image batch for flagged items
+    ├── run_round2_finalize.py           sync + drop stale alphas + Modal bg-removal
+    ├── migrate_review_for_round2.py     prepare review.json for the next round
+    └── stash_round1.py                  extract prior-round images from git LFS
 ```
 
-## Models
-
-| Step | Model | Mode | Cost (full run) |
-|---|---|---|---|
-| Prompter | `gpt-5-mini` (`reasoning_effort=minimal`) | sync | ~$1 |
-| Image gen | `gpt-image-2` quality `low` | OpenAI Batch | ~$22 |
-| Background removal | `BiRefNet-massive` (rembg) | Modal T4 GPU | ~$0.70 |
+The `round2` in the script names is a historical artefact — the same
+scripts handle round 3, round 4, …; each invocation just operates on
+whatever's currently flagged in `review.json`.
 
 ## Storage
 
-Icons are stored via **Git LFS** (`*.png` in `icons/` and `icons_raw/`). A plain
-`git clone` only fetches the small text/CSV files; binaries arrive on first
-checkout (or `git lfs pull`). The repo itself stays small enough to clone in
-seconds.
+Icons are stored via **Git LFS** (`*.png` in `icons/` and `icons_raw/`).
+A plain `git clone` only fetches the small text/CSV files; binaries
+arrive on first checkout (or `git lfs pull`). The repo itself stays
+small enough to clone in seconds.
+
+The pre-review v1 dataset is preserved at tag `v1.0`:
+
+```bash
+git checkout v1.0       # or: git lfs pull --include='icons/*' --revision v1.0
+```
 
 ## License
 
