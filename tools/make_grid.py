@@ -12,11 +12,13 @@ depending on the variant.
 from __future__ import annotations
 
 import argparse
+import csv
 import random
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
+ALIASES = ROOT / "aliases.csv"
 
 CELL = 200
 COLS = 10
@@ -84,9 +86,21 @@ def main() -> None:
     src_dir = (ROOT / "icons") if args.alpha else (ROOT / "icons_raw")
     out = (ROOT / "grid_alpha.png") if args.alpha else (ROOT / "grid.png")
 
+    # Since v3 the working tree contains 7140 files, but only 4987 are
+    # unique images (the rest are alias-resolved duplicates with identical
+    # content). Sample only from canonical codes so the grid never shows
+    # the same image twice in one row.
+    canonical: set[str] = set()
+    if ALIASES.exists():
+        with ALIASES.open(encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                canonical.add(row["icon_code"])
+
     # Bucket icons by Hauptgruppe — first letter of the file stem.
     by_group: dict[str, list[Path]] = {}
     for p in sorted(src_dir.glob("*.png")):
+        if canonical and p.stem not in canonical:
+            continue
         letter = p.stem[:1]
         if letter in HAUPTGRUPPEN:
             by_group.setdefault(letter, []).append(p)
